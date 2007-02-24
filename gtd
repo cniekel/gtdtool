@@ -1,0 +1,138 @@
+#!/usr/bin/python
+# vim:ft=python
+
+import os
+from optparse import OptionParser
+import logging
+import re
+from textwrap import wrap
+
+logging.basicConfig(level=logging.INFO)
+
+actionmatcher = re.compile('(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
+lists = {}
+gtd_dir = '~/gtd/'
+actionlog = logging.getLogger('action')
+class ActionItem(object):
+    def __init__(self, list, code, what, project):
+        self.list = list
+        self.code = code
+        self.what = what
+        self.project = project
+
+        if not lists.has_key(self.list):
+            lists[self.list] = []
+        lists[self.list].append(self)
+    def isUnfinished(self):
+        return self.code in '@'
+    def __str__(self):
+        return '%s [%s]' % (self.what, self.project.title)
+
+class Project(object):
+    log = logging.getLogger('project')
+    def __init__(self):
+        self.data = None
+        pass
+
+    def readfile(self, fname, shortname):
+        self.fname = shortname
+        self.log.debug('reading %s', fname)
+
+        self.lines = open(fname, 'r').readlines()
+        try:
+            self.title = self.lines[0][:-1]
+            self.title.strip()
+        except IndexError:
+            self.log.error('%s has no first line!', shortname)
+        self.check_actionlists()
+
+    def check_actionlists(self):
+        for line in self.lines:
+            m = actionmatcher.search(line)
+            if m:
+                l = m.group('list')
+                what = m.group('what')
+                code = m.group('code')
+
+                what.strip()
+                code.strip()
+
+                ai = ActionItem(l, code, what, self)
+
+
+
+def read_projects():
+    base = os.path.expanduser(gtd_dir)
+    base = os.path.expandvars(base)
+    projs = []
+
+    log = logging.getLogger('walker')
+
+    log.debug('starting at %s', base)
+
+    for root, dirs, files in os.walk(base):
+        if '.bzr' in dirs:
+            dirs.remove('.bzr')
+        nonskipped = [ f for f in files if f[0] != '.' ]
+        for f in nonskipped:
+            log.debug('parse %s', os.path.join(root, f))
+            p = Project()
+            p.readfile(os.path.join(root, f), f)
+            projs.append(p)
+
+    return projs
+
+def parse_cmdargs():
+    parser = OptionParser()
+    parser.add_option('-a', '--actions', action='store_true', default=0,
+            dest='show_action')
+    parser.add_option('-g', '--generate', action='store_true', default=0,
+            dest='generate_html')
+    parser.add_option('-C', '--show-categories', action='store_true',
+            default=0, dest='show_categories')
+    parser.add_option('-n', '--show-numbers', action='store_true',
+            default=0, dest='show_numbers')
+    parser.add_option('-v', '--verbose', action='store_true',
+            default=0, dest='verbose')
+    parser.add_option('-d', '--debug', action='store_true',
+            default=0, dest='debug')
+
+    (option, args) = parser.parse_args()
+
+    return option, args
+
+
+def main():
+
+    op, args = parse_cmdargs()
+    if op.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    #print 'options', op
+    #print 'args', args
+
+    p = read_projects()
+
+    if op.show_categories:
+        k = lists.keys()
+        k.sort()
+        if op.show_numbers:
+            for item in k:
+                print item, len(lists[item])
+        else:
+            for l in wrap(', '.join(k)):
+                print l
+
+    if op.show_action:
+        for k in lists.keys():
+            if k not in ('waitfor', 'maybe', 'someday', 'defer'):
+                print k
+                for it in lists[k]:
+                    if it.isUnfinished():
+                        out = str(it)
+                        for l in wrap(out):
+                            print '   ', l
+
+if __name__ == '__main__':
+    main()
+
