@@ -105,6 +105,8 @@ def parse_cmdargs():
             default=0, dest='verbose')
     parser.add_option('-d', '--debug', action='store_true',
             default=0, dest='debug')
+    parser.add_option('-c', '--category', action='store', dest='category',
+            default='')
 
     (option, args) = parser.parse_args()
 
@@ -133,7 +135,14 @@ def main():
                 print l
 
     if op.show_action:
-        for k in lists.keys():
+        if not op.category:
+            showcategories = lists.keys()
+            showcategories = [ s for s in showcategories if s not in
+                    ('waitfor', 'maybe', 'someday', 'defer')]
+            showcategories.sort()
+        else:
+            showcategories = op.category.split(':')
+        for k in showcategories:
             if k not in ('waitfor', 'maybe', 'someday', 'defer'):
                 print k
                 for it in lists[k]:
