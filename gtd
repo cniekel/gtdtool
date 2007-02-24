@@ -9,7 +9,7 @@ from textwrap import wrap
 
 logging.basicConfig(level=logging.INFO)
 
-actionmatcher = re.compile('(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
+actionmatcher = re.compile('^(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
 lists = {}
 gtd_dir = '~/gtd/'
 actionlog = logging.getLogger('action')
@@ -19,6 +19,9 @@ class ActionItem(object):
         self.code = code
         self.what = what
         self.project = project
+
+        actionlog.debug('Action for list "%s", from project %s', list,
+                project)
 
         if not lists.has_key(self.list):
             lists[self.list] = []
@@ -32,10 +35,13 @@ class Project(object):
     log = logging.getLogger('project')
     def __init__(self):
         self.data = None
+        self.title = ''
+        self.fname = ''
         pass
 
     def readfile(self, fname, shortname):
-        self.fname = shortname
+        self.fname = fname
+        self.shortname = shortname
         self.log.debug('reading %s', fname)
 
         self.lines = open(fname, 'r').readlines()
@@ -45,6 +51,9 @@ class Project(object):
         except IndexError:
             self.log.error('%s has no first line!', shortname)
         self.check_actionlists()
+
+    def __str__(self):
+        return '%s (%s)' % (self.title, self.fname)
 
     def check_actionlists(self):
         for line in self.lines:
