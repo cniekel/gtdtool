@@ -8,11 +8,21 @@ import re
 from textwrap import wrap
 
 logging.basicConfig(level=logging.INFO)
-
 actionmatcher = re.compile('^(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
 lists = {}
 gtd_dir = '~/gtd/'
 actionlog = logging.getLogger('action')
+
+from Cheetah.Template import Template
+
+simpleTemplate = \
+'''$actionlist
+#for it in $actions
+    $it.what [$it.project]
+#end for
+'''
+
+
 class ActionItem(object):
     def __init__(self, list, code, what, project):
         self.list = list
@@ -46,8 +56,7 @@ class Project(object):
 
         self.lines = open(fname, 'r').readlines()
         try:
-            self.title = self.lines[0][:-1]
-            self.title.strip()
+            self.title = self.lines[0][:-1].strip()
         except IndexError:
             self.log.error('%s has no first line!', shortname)
         self.check_actionlists()
@@ -114,7 +123,6 @@ def parse_cmdargs():
 
 
 def main():
-
     op, args = parse_cmdargs()
     if op.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -143,13 +151,22 @@ def main():
         else:
             showcategories = op.category.split(':')
         for k in showcategories:
-            if k not in ('waitfor', 'maybe', 'someday', 'defer'):
-                print k
-                for it in lists[k]:
-                    if it.isUnfinished():
-                        out = str(it)
-                        for l in wrap(out):
-                            print '   ', l
+            if not lists.has_key(k):
+                print 'actionlist %s does not exist.' % (k,)
+            else:
+                namespace = {'actionlist': k, 'actions': lists[k] }
+                template1 = Template(simpleTemplate,
+                        searchList=[namespace])
+                print template1
+
+                if 0:
+
+                    print k
+                    for it in lists[k]:
+                        if it.isUnfinished() or op.verbose:
+                            out = str(it)
+                            for l in wrap(out):
+                                print '   ', l
 
 if __name__ == '__main__':
     main()
