@@ -6,6 +6,10 @@ from optparse import OptionParser
 import logging
 import re
 from textwrap import wrap
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch,cm
+from reportlab.lib.colors import pink, green, brown, white, black
 
 logging.basicConfig(level=logging.INFO)
 actionmatcher = re.compile('^(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
@@ -112,6 +116,8 @@ def parse_cmdargs():
             default=0, dest='show_numbers')
     parser.add_option('-v', '--verbose', action='store_true',
             default=0, dest='verbose')
+    parser.add_option('-p', '--print', action='store_true',
+            default=0, dest='printout')
     parser.add_option('-d', '--debug', action='store_true',
             default=0, dest='debug')
     parser.add_option('-c', '--category', action='store', dest='category',
@@ -120,6 +126,38 @@ def parse_cmdargs():
     (option, args) = parser.parse_args()
 
     return option, args
+
+def print_output(op):
+    print 'print_output'
+    if not op.category:
+        showcategories = lists.keys()
+        showcategories = [ s for s in showcategories if s not in
+                ('waitfor', 'maybe', 'someday', 'defer')]
+        showcategories.sort()
+    else:
+        showcategories = op.category.split(':')
+
+    c = canvas.Canvas('gtdlist.pdf', verbosity=1)
+    text = c.beginText()
+    text.setTextOrigin(cm, A4[1] - cm)
+    text.setFont('Helvetica', 9)
+
+    for k in showcategories:
+        if not lists.has_key(k):
+            print 'actionlist %s does not exist.' % (k,)
+        else:
+            print 'doing a block', k
+            text.textLine(k.title())
+            text.moveCursor(+cm, 0)
+            for it in lists[k]:
+                if it.isUnfinished() or op.verbose:
+                    text.textLine(it.what)
+            text.moveCursor(-cm, +0.5*cm)
+    c.drawText(text)
+    c.showPage()
+    c.save()
+            
+
 
 
 def main():
@@ -142,6 +180,8 @@ def main():
             for l in wrap(', '.join(k)):
                 print l
 
+    if op.printout:
+        print_output(op)
     if op.show_action:
         if not op.category:
             showcategories = lists.keys()
