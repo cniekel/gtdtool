@@ -127,6 +127,18 @@ def parse_cmdargs():
 
     return option, args
 
+def draw_cutlines(canvas):
+    canvas.setDash(1,8)
+    p = canvas.beginPath()
+    #p.setFillGray(0.6)
+    p.moveTo(A4[0]/2, 0)
+    p.lineTo(A4[0]/2, A4[1])
+
+    p.moveTo(0, A4[1]/2)
+    p.lineTo(A4[0], A4[1]/2)
+
+    canvas.drawPath(p)
+
 def print_output(op):
     print 'print_output'
     if not op.category:
@@ -138,21 +150,37 @@ def print_output(op):
         showcategories = op.category.split(':')
 
     c = canvas.Canvas('gtdlist.pdf', verbosity=1)
+    print c.getAvailableFonts()
+    #c.setPageRotation(180)
+
+    #draw_cutlines(c)
+    c.translate(cm, A4[1] - cm)
     text = c.beginText()
-    text.setTextOrigin(cm, A4[1] - cm)
+    text.setTextOrigin(0,0)
     text.setFont('Helvetica', 9)
+    inspring = 0.5*cm
 
     for k in showcategories:
+        text.setFont('Helvetica', 9)
         if not lists.has_key(k):
             print 'actionlist %s does not exist.' % (k,)
         else:
+            if not lists[k]:
+                continue
             print 'doing a block', k
+            text.setFillGray(0.0)
             text.textLine(k.title())
-            text.moveCursor(+cm, 0)
+            text.moveCursor(inspring, 0)
             for it in lists[k]:
                 if it.isUnfinished() or op.verbose:
+                    text.setFillGray(0.0)
                     text.textLine(it.what)
-            text.moveCursor(-cm, +0.5*cm)
+                    #c.rotate(180)
+                    text.setFillGray(0.5)
+                    text.setFont('Helvetica-Oblique', 9)
+                    text.textLine(it.project.title)
+                    #c.rotate(-180)
+            text.moveCursor(-inspring, +0.5*cm)
     c.drawText(text)
     c.showPage()
     c.save()
