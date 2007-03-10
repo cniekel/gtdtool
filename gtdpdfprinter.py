@@ -1,5 +1,6 @@
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame, PageTemplate, BaseDocTemplate
 from reportlab.platypus import KeepTogether
+from reportlab.platypus.flowables import UseUpSpace
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.rl_config import defaultPageSize
 from reportlab.lib.units import inch,cm
@@ -34,7 +35,17 @@ class GTDDocTemplate(BaseDocTemplate):
     def __init__(self, file, **kw):
         BaseDocTemplate.__init__(self,file, **kw)
 
-def print_actionlist(categories, fname):
+headerstyle = ParagraphStyle(name='listheader', 
+        fontName='Helvetica-Bold', fontSize=9, leftIndent=0, firstLineIndent=0,
+        spaceAfter = 0)
+actionstyle = ParagraphStyle(name='listaction', 
+        fontName='Helvetica', fontSize=9, leftIndent=0.5*cm, firstLineIndent=0,
+        spaceAfter = 0)
+projstyle = ParagraphStyle(name='listproject', 
+        fontName='Helvetica-Oblique', fontSize=8, leftIndent=1.5*cm, 
+        firstLineIndent=0, spaceAfter = 1)
+
+def print_actionlist(categories, projects, fname):
     doc = GTDDocTemplate(fname, pageSize=A4)
     doc.addPageTemplates(GTDPageTemplate('gtd', doc.pagesize))
     Story = []
@@ -45,28 +56,31 @@ def print_actionlist(categories, fname):
     style.spaceAfter = 0
     style.refresh()
 
-    headerstyle = ParagraphStyle(name='listheader', 
-            fontName='Helvetica-Bold', fontSize=9, leftIndent=0, firstLineIndent=0,
-            spaceAfter = 0)
-    actionstyle = ParagraphStyle(name='listaction', 
-            fontName='Helvetica', fontSize=9, leftIndent=0.5*cm, firstLineIndent=0,
-            spaceAfter = 0)
-    projstyle = ParagraphStyle(name='listproject', 
-            fontName='Helvetica-Oblique', fontSize=8, leftIndent=1.5*cm, 
-            firstLineIndent=0, spaceAfter = 1)
+    if categories:
+        for k in categories:
+            h = Paragraph(str(k).title(), headerstyle)
+            contents = [h]
+            for action in categories[k]:
+                contents.append(Paragraph(action.what, actionstyle))
+                contents.append(Paragraph(action.project.title, projstyle))
 
-    for k in categories:
-        h = Paragraph(str(k).title(), headerstyle)
-        contents = [h]
-        for action in categories[k]:
-            contents.append(Paragraph(action.what, actionstyle))
-            contents.append(Paragraph(action.project.title, projstyle))
-            #txt = ' '*4 + action.what + ' <i>' + action.project.title + '</i>' 
-            #contents.append(Paragraph(txt, style))
+            p = KeepTogether(contents)
+            Story.append(p)
+            Story.append(Spacer(1, 0.2*inch))
 
-        p = KeepTogether(contents)
-        Story.append(p)
-        Story.append(Spacer(1, 0.2*inch))
+    if categories and projects:
+        Story.append(UseUpSpace())
+    if projects:
+        for p in projects:
+            h = Paragraph(p.title, headerstyle)
+            contents = [h]
+            for paragraph in p.paras:
+                contents.append(Paragraph(paragraph, style))
+            #for ac in p.actions:
+                #contents.append(Paragraph(ac.what, actionstyle))
+            p = KeepTogether(contents)
+            Story.append(p)
+            Story.append(Spacer(0, 0.6*cm))
 
     doc.build(Story)
 
