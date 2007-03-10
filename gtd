@@ -6,11 +6,8 @@ from optparse import OptionParser
 import logging
 import re
 from textwrap import wrap
+import sys
 import gtdpdfprinter
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import inch,cm
-from reportlab.lib.colors import pink, green, brown, white, black
 
 logging.basicConfig(level=logging.INFO)
 actionmatcher = re.compile('^(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
@@ -19,6 +16,7 @@ gtd_dir = '~/gtd/'
 actionlog = logging.getLogger('action')
 
 from Cheetah.Template import Template
+flowlog = logging.getLogger('programflow')
 
 simpleTemplate = \
 '''$actionlist
@@ -26,6 +24,23 @@ simpleTemplate = \
     $it.what [$it.project]
 #end for
 '''
+
+import warnings
+def nothing(*args):
+    pass
+warnings.showwarning = nothing
+
+def printFile(fname):
+    if sys.platform == 'win32':
+        import win32api
+
+        filename = 'gtdlist.pdf'
+        win32api.ShellExecute ( 0, "print", filename, None, ".", 0)
+    elif sys.platform == 'linux':
+        print 'Can I just do lpr %s now?' % fname
+    else:
+        print 'printing not yet supported for your platform'
+        print 'The pdf file is %s' % fname
 
 
 class ActionItem(object):
@@ -109,24 +124,30 @@ def read_projects():
 
 def parse_cmdargs():
     parser = OptionParser()
+    parser.add_option('-A', '--all', action='store_true', default=0,
+            dest='use_all_categories', help='Also display waitfor, maybe, someday and defer categories')
     parser.add_option('-a', '--actions', action='store_true', default=0,
-            dest='show_action')
+            dest='show_action', help='show actions on stdout')
     parser.add_option('-g', '--generate', action='store_true', default=0,
-            dest='generate_html')
+            dest='generate_html', help='unused')
     parser.add_option('-C', '--show-categories', action='store_true',
-            default=0, dest='show_categories')
+            default=0, dest='show_categories', help='Display available categories')
     parser.add_option('-n', '--show-numbers', action='store_true',
-            default=0, dest='show_numbers')
+            default=0, dest='show_numbers', help='if displaying categories, write the number of entries in that category')
     parser.add_option('-v', '--verbose', action='store_true',
             default=0, dest='verbose')
-    parser.add_option('-p', '--print', action='store_true',
-            default=0, dest='printout')
+    parser.add_option('-p', '--pdf', action='store_true',
+            default=0, dest='dopdf', help='create a pdf file')
     parser.add_option('-d', '--debug', action='store_true',
-            default=0, dest='debug')
+            default=0, dest='debug', help='turn debugging output on.')
+    parser.add_option('-P', '--print', action='store_true',
+            default=0, dest='sendprinter', help='Send the generated pdf to the default printer.')
     parser.add_option('-c', '--category', action='store', dest='category',
-            default='')
+            default='',help='limit output/pdf to specified category. For multiple categories, seperate them by a colon.')
 
     (option, args) = parser.parse_args()
+
+    option.filename = 'gtdlist.pdf'
 
     return option, args
 
@@ -143,61 +164,30 @@ def draw_cutlines(canvas):
     canvas.drawPath(p)
 
 def print_output(op):
-    print 'print_output'
-    if not op.category:
+    flowlog.debug('print_output')
+
+    gtdpdfprinter.print_actionlist(lists, op.filename)
+    return
+
+def filter_lists(options):
+    global lists
+    if not options.category:
         showcategories = lists.keys()
-        showcategories = [ s for s in showcategories if s not in
-                ('waitfor', 'maybe', 'someday', 'defer')]
+        if not options.use_all_categories:
+            showcategories = [ s for s in showcategories if s not in
+                    ('waitfor', 'maybe', 'someday', 'defer')]
         showcategories.sort()
     else:
-        showcategories = op.category.split(':')
+        showcategories = options.category.split(':')
 
     categories = {}
     for s in showcategories:
-        l = [a for a in lists[s] if a.isUnfinished() or op.verbose]
-        if l:
-            categories[s] = l
+        if s in lists.keys():
+            l = [a for a in lists[s] if a.isUnfinished() or options.verbose]
+            if l:
+                categories[s] = l
 
-    gtdpdfprinter.print_actionlist(categories, 'gtdlist.pdf')
-    return
-    c = canvas.Canvas('gtdlist.pdf', verbosity=1)
-    print c.getAvailableFonts()
-    #c.setPageRotation(180)
-
-    #draw_cutlines(c)
-    c.translate(cm, A4[1] - cm)
-    text = c.beginText()
-    text.setTextOrigin(0,0)
-    text.setFont('Helvetica', 9)
-    inspring = 0.5*cm
-
-    for k in showcategories:
-        text.setFont('Helvetica', 9)
-        if not lists.has_key(k):
-            print 'actionlist %s does not exist.' % (k,)
-        else:
-            if not lists[k]:
-                continue
-            print 'doing a block', k
-            text.setFillGray(0.0)
-            text.textLine(k.title())
-            text.moveCursor(inspring, 0)
-            for it in lists[k]:
-                if it.isUnfinished() or op.verbose:
-                    text.setFillGray(0.0)
-                    text.textLine(it.what)
-                    #c.rotate(180)
-                    text.setFillGray(0.5)
-                    text.setFont('Helvetica-Oblique', 9)
-                    text.textLine(it.project.title)
-                    #c.rotate(-180)
-            text.moveCursor(-inspring, +0.5*cm)
-    c.drawText(text)
-    c.showPage()
-    c.save()
-            
-def filter_lists(options):
-    pass
+    lists = categories
 
 
 
@@ -222,8 +212,10 @@ def main():
             for l in wrap(', '.join(k)):
                 print l
 
-    if op.printout:
+    if op.dopdf or op.sendprinter:
         print_output(op)
+        if op.sendprinter:
+            printFile(op.filename)
     if op.show_action:
         if not op.category:
             showcategories = lists.keys()
@@ -237,9 +229,12 @@ def main():
                 print 'actionlist %s does not exist.' % (k,)
             else:
                 namespace = {'actionlist': k, 'actions': lists[k] }
-                template1 = Template(simpleTemplate,
-                        searchList=[namespace])
-                print template1
+                try:
+                    template1 = Template(simpleTemplate,
+                            searchList=[namespace])
+                    print template1
+                except UserWarning:
+                    pass
 
                 if 0:
 
