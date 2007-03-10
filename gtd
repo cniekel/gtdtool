@@ -6,6 +6,7 @@ from optparse import OptionParser
 import logging
 import re
 from textwrap import wrap
+import gtdpdfprinter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch,cm
@@ -42,6 +43,8 @@ class ActionItem(object):
         lists[self.list].append(self)
     def isUnfinished(self):
         return self.code in '@'
+    def isFinished(self):
+        return not self.isUnfinished()
     def __str__(self):
         return '%s [%s]' % (self.what, self.project.title)
 
@@ -149,6 +152,14 @@ def print_output(op):
     else:
         showcategories = op.category.split(':')
 
+    categories = {}
+    for s in showcategories:
+        l = [a for a in lists[s] if a.isUnfinished() or op.verbose]
+        if l:
+            categories[s] = l
+
+    gtdpdfprinter.print_actionlist(categories, 'gtdlist.pdf')
+    return
     c = canvas.Canvas('gtdlist.pdf', verbosity=1)
     print c.getAvailableFonts()
     #c.setPageRotation(180)
@@ -185,6 +196,8 @@ def print_output(op):
     c.showPage()
     c.save()
             
+def filter_lists(options):
+    pass
 
 
 
@@ -198,6 +211,7 @@ def main():
 
     p = read_projects()
 
+    filter_lists(op)
     if op.show_categories:
         k = lists.keys()
         k.sort()

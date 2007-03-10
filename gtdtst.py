@@ -35,8 +35,7 @@ class GTDDocTemplate(BaseDocTemplate):
 def myPages(canvas, doc):
     canvas.saveState()
     canvas.setFont('Times-Roman', 9)
-    canvas.drawString(inch, 0.75*inch, 'Page %d %s' % (doc.page, 'test'))
-
+    canvas.drawString(inch, 0.75*inch, 'Page %d %s' % (doc.page, 'test')
 def go():
     doc = GTDDocTemplate('phello.pdf', pageSize=A4)
     doc.addPageTemplates(GTDPageTemplate('gtd', doc.pagesize))
