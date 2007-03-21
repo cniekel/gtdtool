@@ -1,3 +1,4 @@
+import time
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame, PageTemplate, BaseDocTemplate
 from reportlab.platypus import KeepTogether
 from reportlab.platypus.flowables import UseUpSpace
@@ -45,9 +46,11 @@ projstyle = ParagraphStyle(name='listproject',
         fontName='Helvetica-Oblique', fontSize=8, leftIndent=1.5*cm, 
         firstLineIndent=0, spaceAfter = 1)
 
-def print_actionlist(categories, projects, fname):
+def print_actionlist(categories, projects, fname, modtime):
     doc = GTDDocTemplate(fname, pageSize=A4)
     doc.addPageTemplates(GTDPageTemplate('gtd', doc.pagesize))
+    doc.modified_text = time.strftime('%d-%m-%Y',
+            time.localtime(modtime))
     Story = []
     
     style = styles['Normal']
@@ -58,7 +61,8 @@ def print_actionlist(categories, projects, fname):
 
     if categories:
         for k in categories:
-            h = Paragraph(str(k).title(), headerstyle)
+            h = Paragraph(str(k).title() + '      <i>' + doc.modified_text
+                    +'</i>', headerstyle)
             contents = [h]
             for action in categories[k]:
                 contents.append(Paragraph(action.what, actionstyle))
@@ -72,7 +76,9 @@ def print_actionlist(categories, projects, fname):
         Story.append(UseUpSpace())
     if projects:
         for p in projects:
-            h = Paragraph(p.title, headerstyle)
+            h = Paragraph(p.title + '       <i>' +
+                    time.strftime('%d-%m-%Y',
+                    time.localtime(p.modtime))+'</i>', headerstyle)
             contents = [h]
             for paragraph in p.paras:
                 contents.append(Paragraph(paragraph, style))

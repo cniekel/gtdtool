@@ -2,6 +2,7 @@
 # vim:ft=python
 
 import os
+import stat
 from optparse import OptionParser
 import logging
 import re
@@ -77,6 +78,7 @@ class Project(object):
         self.fname = fname
         self.shortname = shortname
         self.log.debug('reading %s', fname)
+        self.modtime = os.stat(fname)[stat.ST_MTIME]
 
         self.lines = open(fname, 'r').readlines()
         try:
@@ -169,10 +171,11 @@ def parse_cmdargs():
 
     return option, args
 
-def print_output(op, projs):
+def print_output(op, projs, latest_time):
     flowlog.debug('print_output')
 
-    gtdpdfprinter.print_actionlist(lists, fname=op.filename, projects=projs)
+    gtdpdfprinter.print_actionlist(lists, fname=op.filename,
+            projects=projs, modtime=latest_time)
     return
 
 def filter_lists(options):
@@ -187,7 +190,7 @@ def filter_lists(options):
         showcategories = options.category.split(':')
 
     if options.exclude:
-        for c in options.exclude.split(':'):
+        for c in optios.exclude.split(':'):
             try:
                 showcategories.remove(c)
             except ValueError:
@@ -214,6 +217,8 @@ def main():
     #print 'args', args
 
     p = read_projects()
+    latest_mtime = max( (x.modtime for x in p) )
+
 
     filter_lists(op)
     if op.show_categories:
@@ -227,7 +232,7 @@ def main():
                 print l
 
     if op.dopdf or op.sendprinter:
-        print_output(op, p)
+        print_output(op, p, latest_mtime)
         if op.sendprinter:
             printFile(op.filename)
     if op.show_action:
