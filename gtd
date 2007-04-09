@@ -11,40 +11,81 @@ import sys
 import gtdpdfprinter
 
 logging.basicConfig(level=logging.INFO)
-actionmatcher = re.compile('^(?P<code>[@*.-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
-lists = {}
+actionmatcher = re.compile('^(?P<code>[@-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
+#lists = {}
 gtd_dir = '~/gtd/'
 actionlog = logging.getLogger('action')
 
-from Cheetah.Template import Template
 flowlog = logging.getLogger('programflow')
 
-simpleTemplate = \
-'''$actionlist
-#for it in $actions
-    $it.what [$it.project]
-#end for
-'''
+autohidden = ('waiting', 'waitfor', 'maybe', 'someday', 'defer')
 
-import warnings
-def nothing(*args):
-    pass
-warnings.showwarning = nothing
+if 0:
+    import warnings
+    def nothing(*args):
+        pass
+    warnings.showwarning = nothing
 
-def printFile(fname):
+def print_file(fname):
     if sys.platform == 'win32':
         import win32api
 
         filename = 'gtdlist.pdf'
         win32api.ShellExecute ( 0, "print", filename, None, ".", 0)
-    elif sys.platform == 'linux':
-        print 'Can I just do lpr %s now?' % fname
     else:
         print 'printing not yet supported for your platform'
         print 'The pdf file is %s' % fname
+        if sys.platform == 'linux':
+            print 'Can I just do lpr %s now?' % fname
 
+class ActionList(object):
+    """ Keep a list of all actions, both outstanding and completed, and
+    grouped in categories. """
+
+    def __init__(self):
+        self.lists = {}
+        self.showcategories = []
+        self.showcompleted = False
+    def add(self, list, action):
+        if not self.lists.has_key(list):
+            self.lists[list] = []
+        self.lists[list].append(action)
+
+    def filter(self, options):
+        """ Filter the actionlist according to user-request."""
+        if not options.category:
+            self.showcategories = self.lists.keys()
+            if not options.use_all_categories:
+                self.showcategories = [ s for s in self.showcategories 
+                        if s not in autohidden ]
+                self.showcategories.sort()
+        else:
+            self.showcategories = options.category.split(':')
+
+        if options.exclude:
+            for c in options.exclude.split(':'):
+                try:
+                    self.showcategories.remove(c)
+                except ValueError:
+                    pass
+        self.showcompleted = options.verbose
+
+    def getFilteredElements(self):
+        categories = {}
+        for s in self.showcategories:
+            if s in self.lists.keys():
+                l = [a for a in self.lists[s] 
+                        if a.isUnfinished() or self.showcompleted]
+                if l:
+                    categories[s] = l
+
+        return categories
 
 class ActionItem(object):
+    """ An actionable item. It belongs to a 'list' (category or context),
+    has a code (@ or -) which indicates whether it's done or not, and is
+    part of a project. """
+    actionlist = ActionList()
     def __init__(self, list, code, what, project):
         self.list = list
         self.code = code
@@ -54,9 +95,7 @@ class ActionItem(object):
         actionlog.debug('Action for list "%s", from project %s', list,
                 project)
 
-        if not lists.has_key(self.list):
-            lists[self.list] = []
-        lists[self.list].append(self)
+        self.actionlist.add(self.list, self)
     def isUnfinished(self):
         return self.code in '@'
     def isFinished(self):
@@ -106,7 +145,8 @@ class Project(object):
                 ai = ActionItem(l, code, what, self)
                 self.actions.append(ai)
                 self.paras.append(' '.join(p))
-                self.paras.append(code + l + ': ' + what)
+                if code in '@':
+                    self.paras.append(code + l + ': ' + what)
                 p = []
             else:
                 if line.strip() == '':
@@ -131,8 +171,8 @@ def read_projects():
     for root, dirs, files in os.walk(base):
         if '.bzr' in dirs:
             dirs.remove('.bzr')
-        nonskipped = [ f for f in files if f[0] != '.' ]
-        for f in nonskipped:
+        nonhidden = [ f for f in files if f[0] != '.' ]
+        for f in nonhidden:
             log.debug('parse %s', os.path.join(root, f))
             p = Project()
             p.readfile(os.path.join(root, f), f)
@@ -142,28 +182,34 @@ def read_projects():
 
 def parse_cmdargs():
     parser = OptionParser()
-    parser.add_option('-A', '--all', action='store_true', default=0,
-            dest='use_all_categories', help='Also display waitfor, maybe, someday and defer categories')
     parser.add_option('-a', '--actions', action='store_true', default=0,
-            dest='show_action', help='show actions on stdout')
-    parser.add_option('-g', '--generate', action='store_true', default=0,
-            dest='generate_html', help='unused')
+            dest='show_action', help='show actions')
+    parser.add_option('-p', '--projects', action='store_true', default=0, 
+            dest='show_projects', help='show projects')
+
+    parser.add_option('-P', '--print', action='store_true',
+            default=0, dest='output_printer', help='Send pdf output to printer.')
+    parser.add_option('-s', '--stdout', action='store_true',
+            default=0, dest='output_stdout', help='Display output on stdout')
+    parser.add_option('', '--pdf', action='store_true',
+            default=0, dest='output_pdf', help='Display output in pdf file')
+
+    parser.add_option('-A', '--all', action='store_true', default=0,
+            dest='use_all_categories', help='Also display categories normally hidden (' 
+                    + ','.join(autohidden) + ')')
     parser.add_option('-C', '--show-categories', action='store_true',
             default=0, dest='show_categories', help='Display available categories')
-    parser.add_option('-n', '--show-numbers', action='store_true',
-            default=0, dest='show_numbers', help='if displaying categories, write the number of entries in that category')
-    parser.add_option('-v', '--verbose', action='store_true',
-            default=0, dest='verbose')
-    parser.add_option('-p', '--pdf', action='store_true',
-            default=0, dest='dopdf', help='create a pdf file')
-    parser.add_option('-d', '--debug', action='store_true',
-            default=0, dest='debug', help='turn debugging output on.')
-    parser.add_option('-P', '--print', action='store_true',
-            default=0, dest='sendprinter', help='Send the generated pdf to the default printer.')
     parser.add_option('-c', '--category', action='store', dest='category',
             default='',help='limit output/pdf to specified category. For multiple categories, seperate them by a colon.')
     parser.add_option('-x', '--exclude', action='store',
             default=0, dest='exclude', help='Exclude selected categories (separate with colons) from the output.')
+
+    parser.add_option('-n', '--show-numbers', action='store_true',
+            default=0, dest='show_numbers', help='if displaying categories, write the number of entries in that category')
+    parser.add_option('-v', '--verbose', action='store_true',
+            default=0, dest='verbose')
+    parser.add_option('-d', '--debug', action='store_true',
+            default=0, dest='debug', help='turn debugging output on.')
 
     (option, args) = parser.parse_args()
 
@@ -171,17 +217,16 @@ def parse_cmdargs():
 
     return option, args
 
-def print_output(op, projs, latest_time):
-    flowlog.debug('print_output')
+def generate_pdf(op, projs, latest_time):
+    flowlog.debug('generate_pdf')
 
-    gtdpdfprinter.print_actionlist(lists, fname=op.filename,
+    gtdpdfprinter.print_actionlist(ActionItem.actionlist, fname=op.filename,
             projects=projs, modtime=latest_time)
     return
 
 def filter_lists(options):
-    global lists
     if not options.category:
-        showcategories = lists.keys()
+        showcategories = ActionItem.actionlist.keys()
         if not options.use_all_categories:
             showcategories = [ s for s in showcategories if s not in
                     ('waitfor', 'maybe', 'someday', 'defer')]
@@ -197,15 +242,26 @@ def filter_lists(options):
                 pass
     categories = {}
     for s in showcategories:
-        if s in lists.keys():
-            l = [a for a in lists[s] if a.isUnfinished() or options.verbose]
+        if s in ActionItem.actionlist.keys():
+            l = [a for a in ActionItem.actionlist[s] if a.isUnfinished() or options.verbose]
             if l:
                 categories[s] = l
 
 
 
-    lists = categories
+    ActionItem.actionlist = categories
 
+def show_actions_stdout(elements):
+    for k in elements.keys():
+        print k
+        for it in elements[k]:
+            if it.isUnfinished() or op.verbose:
+                out = str(it)
+                for l in wrap(out):
+                    print '   ', l
+def show_projects_stdout(projs):
+    for p in projs:
+        print p
 
 
 def main():
@@ -219,51 +275,30 @@ def main():
     p = read_projects()
     latest_mtime = max( (x.modtime for x in p) )
 
-
-    filter_lists(op)
+    ActionItem.actionlist.filter(op)
+    elements = ActionItem.actionlist.getFilteredElements()
     if op.show_categories:
-        k = lists.keys()
+        k = elements.keys()
         k.sort()
         if op.show_numbers:
             for item in k:
-                print item, len(lists[item])
+                print item, len(elements[item])
         else:
             for l in wrap(', '.join(k)):
                 print l
 
-    if op.dopdf or op.sendprinter:
-        print_output(op, p, latest_mtime)
-        if op.sendprinter:
-            printFile(op.filename)
-    if op.show_action:
-        if not op.category:
-            showcategories = lists.keys()
-            showcategories = [ s for s in showcategories if s not in
-                    ('waitfor', 'maybe', 'someday', 'defer')]
-            showcategories.sort()
-        else:
-            showcategories = op.category.split(':')
-        for k in showcategories:
-            if not lists.has_key(k):
-                print 'actionlist %s does not exist.' % (k,)
-            else:
-                namespace = {'actionlist': k, 'actions': lists[k] }
-                try:
-                    template1 = Template(simpleTemplate,
-                            searchList=[namespace])
-                    print template1
-                except UserWarning:
-                    pass
+    if op.output_pdf or op.output_printer:
+        generate_pdf(op, p, latest_mtime)
+        if op.output_printer:
+            print_file(op.filename)
+    if op.output_stdout:
+        if op.show_action:
+            show_actions_stdout(elements)
+        if op.show_projects:
+            show_projects_stdout(p)
 
-                if 0:
-
-                    print k
-                    for it in lists[k]:
-                        if it.isUnfinished() or op.verbose:
-                            out = str(it)
-                            for l in wrap(out):
-                                print '   ', l
-
+    if not op.output_stdout and not op.output_pdf and not op.output_printer:
+        print "No output selected, it's all for nothing!"
     return p
 
 if __name__ == '__main__':

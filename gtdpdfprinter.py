@@ -46,7 +46,9 @@ projstyle = ParagraphStyle(name='listproject',
         fontName='Helvetica-Oblique', fontSize=8, leftIndent=1.5*cm, 
         firstLineIndent=0, spaceAfter = 1)
 
-def print_actionlist(categories, projects, fname, modtime):
+def print_actionlist(actionlist, projects, fname, modtime):
+    elements = actionlist.getFilteredElements()
+    categories = elements
     doc = GTDDocTemplate(fname, pageSize=A4)
     doc.addPageTemplates(GTDPageTemplate('gtd', doc.pagesize))
     doc.modified_text = time.strftime('%d-%m-%Y',
@@ -74,7 +76,7 @@ def print_actionlist(categories, projects, fname, modtime):
 
     if categories and projects:
         Story.append(UseUpSpace())
-    if projects:
+    if False and projects:
         for p in projects:
             h = Paragraph(p.title + '       <i>' +
                     time.strftime('%d-%m-%Y',
