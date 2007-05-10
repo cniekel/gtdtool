@@ -220,7 +220,7 @@ def parse_cmdargs():
 def generate_pdf(op, projs, latest_time):
     flowlog.debug('generate_pdf')
 
-    gtdpdfprinter.print_actionlist(ActionItem.actionlist, fname=op.filename,
+    gtdpdfprinter.print_actionlist(op, ActionItem.actionlist, fname=op.filename,
             projects=projs, modtime=latest_time)
     return
 

@@ -9,6 +9,11 @@ from reportlab.lib.pagesizes import A4
 PAGE_HEIGHT=defaultPageSize[1]; PAGE_WIDTH=defaultPageSize[0]
 styles = getSampleStyleSheet()
 
+def escape(text):
+        text = text.replace('&', '&amp;')
+        text = text.replace('<', '&lt;')
+        return text.replace('>', '&gt;')
+
 
 class GTDPageTemplate(PageTemplate):
     def __init__(self, id, pageSize=defaultPageSize):
@@ -46,7 +51,7 @@ projstyle = ParagraphStyle(name='listproject',
         fontName='Helvetica-Oblique', fontSize=8, leftIndent=1.5*cm, 
         firstLineIndent=0, spaceAfter = 1)
 
-def print_actionlist(actionlist, projects, fname, modtime):
+def print_actionlist(op, actionlist, projects, fname, modtime):
     doc = GTDDocTemplate(fname, pageSize=A4)
     doc.addPageTemplates(GTDPageTemplate('gtd', doc.pagesize))
     doc.modified_text = time.strftime('%d-%m-%Y',
@@ -62,29 +67,29 @@ def print_actionlist(actionlist, projects, fname, modtime):
     style.spaceAfter = 0
     style.refresh()
 
-    if categories:
+    if op.show_action:
         for k in categories:
             h = Paragraph(str(k).title() + '      <i>' + doc.modified_text
                     +'</i>', headerstyle)
             contents = [h]
             for action in categories[k]:
-                contents.append(Paragraph(action.what, actionstyle))
-                contents.append(Paragraph(action.project.title, projstyle))
+                contents.append(Paragraph(escape(action.what), actionstyle))
+                contents.append(Paragraph(escape(action.project.title), projstyle))
 
             p = KeepTogether(contents)
             Story.append(p)
             Story.append(Spacer(1, 0.2*inch))
 
-    if categories and projects:
+    if op.show_action and categories and op.show_projects and projects:
         Story.append(UseUpSpace())
-    if projects:
+    if op.show_projects and projects:
         for p in projects:
-            h = Paragraph(p.title + '       <i>' +
+            h = Paragraph(escape(p.title) + '       <i>' +
                     time.strftime('%d-%m-%Y',
                     time.localtime(p.modtime))+'</i>', headerstyle)
             contents = [h]
             for paragraph in p.paras:
-                contents.append(Paragraph(paragraph, style))
+                contents.append(Paragraph(escape(paragraph), style))
             #for ac in p.actions:
                 #contents.append(Paragraph(ac.what, actionstyle))
             p = KeepTogether(contents)
