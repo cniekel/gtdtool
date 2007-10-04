@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2.5
 # vim:ft=python
 
 import os
@@ -171,7 +171,10 @@ def read_projects():
     for root, dirs, files in os.walk(base):
         if '.bzr' in dirs:
             dirs.remove('.bzr')
-        nonhidden = [ f for f in files if f[0] != '.' ]
+        for d in dirs:
+            if d.startswith('.'):
+                dirs.remove(d)
+        nonhidden = [ f for f in files if f[0] != '.' and f.endswith('.gtd')]
         for f in nonhidden:
             log.debug('parse %s', os.path.join(root, f))
             p = Project()
@@ -263,6 +266,25 @@ def show_projects_stdout(projs):
     for p in projs:
         print p
 
+def shorten_path(f):
+    homedir = os.path.expanduser("~")
+
+    if f.startswith(homedir):
+        return os.path.join('~', f[len(homedir)+1:])
+    return f
+
+def generate_indexfile(projs):
+    base = os.path.expanduser(gtd_dir)
+    base = os.path.expandvars(base)
+
+    f = open(os.path.join(base, "index"), 'w')
+    f.write('Files in gtd:   # vim tw=0 ro nowrap\n')
+
+
+    for p in projs:
+        f.write('%-25s - %s\n'% (shorten_path(p.fname), p.title))
+
+    f.close()
 
 def main():
     op, args = parse_cmdargs()
@@ -277,6 +299,7 @@ def main():
 
     ActionItem.actionlist.filter(op)
     elements = ActionItem.actionlist.getFilteredElements()
+    generate_indexfile(p)
     if op.show_categories:
         k = elements.keys()
         k.sort()
