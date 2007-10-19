@@ -320,8 +320,6 @@ def main():
         if op.show_projects:
             show_projects_stdout(p)
 
-    if not op.output_stdout and not op.output_pdf and not op.output_printer:
-        print "No output selected, it's all for nothing!"
     return p
 
 if __name__ == '__main__':
