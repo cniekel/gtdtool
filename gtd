@@ -284,6 +284,7 @@ def generate_indexfile(projs):
     for p in projs:
         f.write('%-25s - %s\n'% (shorten_path(p.fname), p.title))
 
+    f.write('vi: ro autoread')
     f.close()
 
 def main():
