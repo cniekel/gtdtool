@@ -8,7 +8,10 @@ import logging
 import re
 from textwrap import wrap
 import sys
-import gtdpdfprinter
+try:
+    import gtdpdfprinter
+except ImportError:
+    gtdpdfprinter = None
 
 logging.basicConfig(level=logging.INFO)
 actionmatcher = re.compile('^(?P<code>[@-])(?P<list>[a-zA-Z0-9]*)[ :](?P<what>.*)$')
@@ -223,8 +226,12 @@ def parse_cmdargs():
 def generate_pdf(op, projs, latest_time):
     flowlog.debug('generate_pdf')
 
-    gtdpdfprinter.print_actionlist(op, ActionItem.actionlist, fname=op.filename,
-            projects=projs, modtime=latest_time)
+    if gtdpdfprinter:
+        gtdpdfprinter.print_actionlist(op, ActionItem.actionlist, 
+                fname=op.filename, projects=projs, modtime=latest_time)
+    else:
+        print 'pdf creation not available, probably due to reportlab missing'
+
     return
 
 def filter_lists(options):
