@@ -216,7 +216,8 @@ def parse_cmdargs():
             default=0, dest='verbose')
     parser.add_option('-d', '--debug', action='store_true',
             default=0, dest='debug', help='turn debugging output on.')
-
+    parser.add_option('-i', '--index', action='store_true',
+            default=0, dest='error_index', help='show all files in vim errorfile format')
     (option, args) = parser.parse_args()
 
     option.filename = 'gtdlist.pdf'
@@ -280,6 +281,10 @@ def shorten_path(f):
         return os.path.join('~', f[len(homedir)+1:])
     return f
 
+def dump_index(projs):
+    for p in projs:
+        sys.stderr.write('%s:%s\n'% (shorten_path(p.fname), p.title))
+
 def generate_indexfile(projs):
     base = os.path.expanduser(gtd_dir)
     base = os.path.expandvars(base)
@@ -304,6 +309,9 @@ def main():
 
     p = read_projects()
     latest_mtime = max( (x.modtime for x in p) )
+
+    if op.error_index:
+        dump_index(p)
 
     ActionItem.actionlist.filter(op)
     elements = ActionItem.actionlist.getFilteredElements()
