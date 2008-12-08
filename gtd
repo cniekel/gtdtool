@@ -89,11 +89,12 @@ class ActionItem(object):
     has a code (@ or -) which indicates whether it's done or not, and is
     part of a project. """
     actionlist = ActionList()
-    def __init__(self, list, code, what, project):
+    def __init__(self, list, code, what, project, lineno):
         self.list = list
         self.code = code
         self.what = what
         self.project = project
+        self.lineno = lineno
 
         actionlog.debug('Action for list "%s", from project %s', list,
                 project)
@@ -135,7 +136,9 @@ class Project(object):
     def check_actionlists(self):
         self.paras = []
         p  = []
+        lineno = 1
         for line in self.lines[1:]:
+            lineno += 1
             m = actionmatcher.search(line)
             if m:
                 l = m.group('list')
@@ -145,7 +148,7 @@ class Project(object):
                 what.strip()
                 code.strip()
 
-                ai = ActionItem(l, code, what, self)
+                ai = ActionItem(l, code, what, self, lineno)
                 self.actions.append(ai)
                 self.paras.append(' '.join(p))
                 if code in '@':
@@ -218,8 +221,10 @@ def parse_cmdargs():
             default=0, dest='debug', help='turn debugging output on.')
     parser.add_option('-i', '--index', action='store_true',
             default=0, dest='error_index', help='show all files in vim errorfile format')
-    (option, args) = parser.parse_args()
+    parser.add_option('-e', '--errorformat', action='store_true',
+            default=0, dest='error_format', help='show all files in vim errorfile format')
 
+    (option, args) = parser.parse_args()
     option.filename = 'gtdlist.pdf'
 
     return option, args
@@ -261,6 +266,12 @@ def filter_lists(options):
 
 
     ActionItem.actionlist = categories
+def show_actions_errorformat(elements):
+    for k in elements.keys():
+        for item in elements[k]:
+            if item.isUnfinished() or op.verbose:
+                sys.stderr.write("%s:%d:%s\n" % 
+                        (item.project.fname, item.lineno, item.project.title))
 
 def show_actions_stdout(elements):
     for k in elements.keys():
@@ -330,6 +341,8 @@ def main():
         generate_pdf(op, p, latest_mtime)
         if op.output_printer:
             print_file(op.filename)
+    if op.error_format:
+        show_actions_errorformat(elements)
     if op.output_stdout:
         if op.show_action:
             show_actions_stdout(elements)
