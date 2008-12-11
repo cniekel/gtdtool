@@ -175,11 +175,12 @@ def read_projects():
     log.debug('starting at %s', base)
 
     for root, dirs, files in os.walk(base):
-        if '.bzr' in dirs:
-            dirs.remove('.bzr')
+        to_skip = []
         for d in dirs:
             if d.startswith('.'):
-                dirs.remove(d)
+                to_skip.append(d)
+        for d in to_skip:
+            dirs.remove(d)
         nonhidden = [ f for f in files if f[0] != '.' and f.endswith('.gtd')]
         for f in nonhidden:
             log.debug('parse %s', os.path.join(root, f))
