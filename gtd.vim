@@ -28,7 +28,7 @@ function! GtdOverview()
     setlocal readonly
     setlocal nomodified
     cwindow
-    nmap <buffer> g :call GtdCategoryFromFile()<CR>
+    nmap <buffer> <space> :call GtdCategoryFromFile()<CR>
 endfunction
 command! GtdOverview call GtdOverview()
 
